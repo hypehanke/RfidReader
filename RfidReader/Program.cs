@@ -1,6 +1,9 @@
 ﻿/*
  *  Source: MERCURY API >>   ..\mercuryapi-1.31.2.40\cs\Samples\Codelets\Codelets.sln
- *  3.4.2019 by Hypehanke 
+ *  3.4.2019 by Hypehanke
+ *  Mercury Api tarvitsee ladata täältä https://www.jadaktech.com/documentation/rfid/mercuryapi/
+ *  Lisätään MercuryAPI.dll käyttöön painamalla References päälä oikeaa nappia ja valitaan Add Reference
+ *  Valitaan vasemalta Browse alhaalta nappi Browse haetaan puretusta kansiosta(esim. C:\mercuryapi-1.31.2.40\cs) MercuryAPI.dll tiedosto
  */
 using System;
 //using System.Collections.Generic;

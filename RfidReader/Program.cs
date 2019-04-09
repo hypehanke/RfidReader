@@ -247,16 +247,16 @@ namespace RfidReader
                             Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
                             string tmpStr = "2700";
                             t.Value = tmpStr;
+
+                            rfidAntennaPowerValue = tmpValue;
+                            Console.WriteLine("New antenna power value given: " + t.Value);
+
                         }
                     }
                     js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
 
                     //tämä arvo ei muuta mitään rfid threadissa
                     publicRfidThread.Abort();
-
-                    rfidAntennaPowerValue = tmpValue;
-                    Console.WriteLine("New antenna power value given: " + t.Value);
-
                     publicRfidThread = new Thread(new ThreadStart(RFIDInit));
                     publicRfidThread.Start();
                 }

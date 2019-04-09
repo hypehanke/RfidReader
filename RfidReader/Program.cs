@@ -248,19 +248,17 @@ namespace RfidReader
                             string tmpStr = "2700";
                             t.Value = tmpStr;
                         }
-
-                        //tämä arvo ei muuta mitään rfid threadissa
-                        publicRfidThread.Abort();
-                        
-                        rfidAntennaPowerValue = tmpValue;
-                        Console.WriteLine("New antenna power value given: " + t.Value);
-
-                        publicRfidThread = new Thread(new ThreadStart(RFIDInit));
-                        publicRfidThread.Start();
                     }
-
                     js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
-                    
+
+                    //tämä arvo ei muuta mitään rfid threadissa
+                    publicRfidThread.Abort();
+
+                    rfidAntennaPowerValue = tmpValue;
+                    Console.WriteLine("New antenna power value given: " + t.Value);
+
+                    publicRfidThread = new Thread(new ThreadStart(RFIDInit));
+                    publicRfidThread.Start();
                 }
 
                 string json = JsonConvert.SerializeObject(js);

@@ -61,7 +61,7 @@ namespace RfidReader
          *  thresholdValueForThreadSleep .. give a value milliseconds
          */
         private static int thresholdValueForCount = 30;
-        private static int thresholdValueForThreadSleep = 500;
+        public static int thresholdValueForThreadSleep = 3000;
 
         // NOTICE: You might have to change your RFID Reader (Mercury 6) IP address (often)
         // NOTICE: How to do that?
@@ -75,8 +75,7 @@ namespace RfidReader
             // NOTICE: Open Universal Assistant Reader program in your PC to get the Merury 6 reader IP address.
             string ipOsoite = "tmr://10.103.1.68/";
 
-            try
-            {
+            
 
                 // Create Reader object, connecting to physical device.
                 using (Reader r = Reader.Create(ipOsoite))
@@ -84,6 +83,7 @@ namespace RfidReader
                     // 1st: 
                     // Make a connection within given ipAddress
                     r.Connect();
+                    
                     Console.WriteLine("*** CONNECTION SUCCESSFULL .. great .. let's begin ..");
 
                     int currentPower = 0;
@@ -121,12 +121,17 @@ namespace RfidReader
                      * RFID tag is came visible range of antenna.
                      * See more about Thread functionality from docs.
                      */
+
+                    
                     r.TagRead += delegate (Object sender, TagReadDataEventArgs e)
                     {
                         bool epcExistOnList = epcList.Contains(e.TagReadData.EpcString.ToString());
                         if (!epcExistOnList)
                         {
-                            Console.WriteLine("RFID tag data: [count: " + e.TagReadData.ReadCount + "], EPC: " + e.TagReadData.EpcString + ", RAW DATA: " + e.TagReadData);
+                            Console.WriteLine("------------");
+                            Console.WriteLine("RFID tag data: [count: " + e.TagReadData.ReadCount + "]");
+                            Console.WriteLine("EPC: " + e.TagReadData.EpcString);
+                            //Console.WriteLine("RAW DATA: " + e.TagReadData);
                             epcList.Add(e.TagReadData.EpcString.ToString());
                         }
                         /*if (e.TagReadData.ReadCount < thresholdValueForCount)
@@ -144,38 +149,62 @@ namespace RfidReader
                         {
                             js.rfidDataToString.Add(e.TagReadData.EpcString.ToString());
                         }
+
+                        // Search for tags in the background
+
+                        
                     };
 
-                    // Create and add read exception listener
-                    r.ReadException += new EventHandler<ReaderExceptionEventArgs>(r_ReadException);
+                ConsoleKeyInfo cki;
+                while (true)
+                {
+                    /*cki = Console.ReadKey();
 
-                    while (!keyPressed)
+                    if (cki.Key == ConsoleKey.D)
                     {
-                        // Search for tags in the background
-                        r.StartReading();
-                        Console.WriteLine("r.StartReading() .. QUIT reading with CTRL + C");
-                        js.rfidDataToString.Clear();
-                        epcList.Clear();
-                        Thread.Sleep(thresholdValueForThreadSleep);
+                        r.Destroy();
+                        System.Environment.Exit(1);
                     }
+                    else if (cki.Key == ConsoleKey.R)
+                    {
+                        r.Reboot();
+                        System.Environment.Exit(1);
+                    }
+                    else if (cki.Key == ConsoleKey.A)
+                    {
+                        Console.WriteLine("Antenna power" + currentPower);
+                        //r.Destroy();
+                        //r.Reboot();
+                        //System.Environment.Exit(1);
+                    }
+                    */
+                   
+
+
+                    r.StartReading();
+                    Console.WriteLine("########################## r.StartReading() .. QUIT reading with CTRL + C");
+                    Console.WriteLine("Sleep " + thresholdValueForThreadSleep.ToString());
+
+
+                    js.rfidDataToString.Clear();
+                    epcList.Clear();
+
+                    //Thread.Sleep(thresholdValueForThreadSleep);
+                    Thread.Sleep(100);
+                    //rfth.ThreadState;
 
                     r.StopReading();
-                    Console.WriteLine("r.StopReading().");
+                    Console.WriteLine("########################## r.StopReading().");
+                    
+
                 }
-            }
-            catch (ReaderException re)
-            {
-                Console.WriteLine("Error: " + re.Message);
-                Console.Out.Flush();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error: " + ex.Message);
+
             }
 
-            //TODO: SEURAAVALLA READLINE:LLA PYSÄYTETÄÄN OHJELMA PYSÄHTYMÄSTÄ ILMAN KUITTAUSTA
-            Console.ReadLine();
+
         }
+
+
 
         static void Main(string[] args)
         {
@@ -228,6 +257,8 @@ namespace RfidReader
                         int tmpValue = System.Convert.ToInt32(t.Value);
                         Console.WriteLine("New timeout value given: " + tmpValue);
                         //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
+
+                        thresholdValueForThreadSleep = tmpValue;
                     }
 
                     if (t.Key == "antennapower")
@@ -238,17 +269,18 @@ namespace RfidReader
                             Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
                             string tmpStr = "2700";
                             t.Value = tmpStr;
+                            rfidAntennapower = tmpValue;
                         }
-
-                        //tämä arvo ei muuta mitään rfid threadissa
-                        rfth.Abort();
-
-                        rfidAntennapower = tmpValue;
-                        Console.WriteLine("New antenna power value given: " + t.Value);
-
-                        rfth = new Thread(new ThreadStart(RFIDInit));
-                        rfth.Start();
                     }
+
+                    //tämä arvo ei muuta mitään rfid threadissa
+                    rfth.Abort();
+
+                    
+                    Console.WriteLine("New antenna power value given: " + t.Value);
+
+                    rfth = new Thread(new ThreadStart(RFIDInit));
+                    rfth.Start();
 
                     js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
 

@@ -27,10 +27,10 @@ namespace RfidReader
     class Program
     {
         /* PARAMETER(s): */
-        static int rfidTimeout = 400;       //NOTE: RFID timeout value (ms), used inside of While-loop
-        static int rfidAntennaPowerValue = 2300; //NOTE: Max value is (27 dBm) -> 2700
-        static int rfidCountThreshold = 30; //NOTE: Limit for RFID count value, if wanted to block some tags..
-        // RFID Reader IP Addres: when changed -> open Universal Reader Assistant program ..
+        static int rfidTimeout = 400;               //NOTE: RFID timeout value (ms), used inside of While-loop
+        static int rfidAntennaPowerValue = 2300;    //NOTE: Max value is (27 dBm) -> 2700
+        static int rfidCountThreshold = 30;         //NOTE: E.g. limit for RFID count value, if wanted to block some tags out?
+        // RFID Reader IP Address: if/when it has changed -> open Universal Reader Assistant program ..
         static string ipAddress = "tmr://10.103.1.68/";
 
         static HttpListener _httpListener = new HttpListener();
@@ -60,7 +60,7 @@ namespace RfidReader
             try
             {
                 
-                // Create Reader object, connecting to physical device.
+                // Create RFID Reader object, connecting to physical device.
                 using (Reader r = Reader.Create(ipAddress))
                 {
                     // 1st: 
@@ -68,54 +68,65 @@ namespace RfidReader
                     r.Connect();
                     Console.WriteLine("*** CONNECTION SUCCESSFULL .. great .. let's begin ..");
 
-                    int currentPower = 0;
-
                     // 2nd:
-                    // NOTE: IMPORTANT!
+                    // NOTE: IMPORTANT !!
                     // After successful connection verify RFID antenna readPower value..
-                    // maximum value is (max: 27dBm), use integer value with 4 numbers --> e.g. 2700
+                    // maximum value is (max: 27dBm), use integer value within 4 numbers --> e.g. 2700
                     int getAntennaReadPowerValue = (int)r.ParamGet("/reader/radio/readPower");
                     Console.WriteLine("*** Antenna readPower value: " + getAntennaReadPowerValue);
                     if (getAntennaReadPowerValue > 2700)
                     {
-                        //int setNewAntennaReadPowerValue = rfidAntennaPowerValue;
-                        //int setNewAntennaReadPowerValue = 2300; //TODO:default value & this can be changed later
-                        //r.ParamSet("/reader/radio/readPower", setNewAntennaReadPowerValue);
-                        r.ParamSet("/reader/radio/readPower", rfidAntennaPowerValue);
+                        //Note: progress in this If-statement..
+                        //1st new public antenna power is given and 2nd printed out is the given value changed or not
+                        //r.ParamSet("/reader/radio/readPower", rfidAntennaPowerValue);
+                        r.ParamSet("/reader/radio/writePower", rfidAntennaPowerValue);
                         int testReadPowerValue = (int)r.ParamGet("/reader/radio/readPower");
                         Console.WriteLine("*** Antenna readPower (max 27 dBm) exceeded, new value given: " + testReadPowerValue);
-                        currentPower = testReadPowerValue;
                     }
                     else {
-                        //Console.WriteLine("else");
-                        int setNewAntennaReadPowerValue = rfidAntennaPowerValue; //TODO:default value & this can be changed later
-                        r.ParamSet("/reader/radio/readPower", setNewAntennaReadPowerValue);
-                        int testReadPowerValue = (int)r.ParamGet("/reader/radio/readPower");
-                        Console.WriteLine("*** readPower value given: " + testReadPowerValue);
-                        currentPower = testReadPowerValue;
+                        //Note: progress in this Else-statement..
+                        //if RFID Reader antenna power value differs from public value -> public value is used
+                        if(getAntennaReadPowerValue != rfidAntennaPowerValue)
+                        {
+                            r.ParamSet("/reader/radio/readPower", rfidAntennaPowerValue);
+                            Console.WriteLine("*** Rfid public antenna readPower value given: " + rfidAntennaPowerValue);
+                        }
+                        else
+                        {
+                            Console.WriteLine("*** Antenna readPower stayed as it was inside RFID reader: " + getAntennaReadPowerValue + ", Rfid public antenna readPower value: " + rfidAntennaPowerValue);
+                            rfidAntennaPowerValue = getAntennaReadPowerValue;
+                        }
                     }
 
                     /*koitetaan pistää nämä json muotoon*/
                     //JsonStack js = new JsonStack();
-                    js.Name = "Samk M6 MercuryAPI server, antenna power: " + currentPower.ToString();
+                    //TODO:js.Name = "Samk M6 MercuryAPI server, antenna power: " + currentPower.ToString();
+                    js.Name = "Samk M6 MercuryAPI server, antenna power: " + rfidAntennaPowerValue.ToString();
                     js.rfidDataToString = new List<string>();
-                    //TODO: New addition for Console logging purposes. Wanted show EPC only at once.
+
+                    //Note:
+                    //Next string list is made for Console logging purposes. Wanted to shows EPC data only at once.
                     List<string> epcList = new List<string>();
 
                     /* IMPORTANT part of the code!
                      * The next delegate function is went through immediatelly when ..
                      * RFID tag is came visible range of antenna.
-                     * See more about Thread functionality from docs.
+                     * See more about Thread functionality from docs and ..
+                     * Mercury API: ..\mercuryapi-1.31.2.40\cs\Samples\Codelets\ReadAsync\ReadAsync.cs
                      */
+
+                    // Create and add tag listener
                     r.TagRead += delegate (Object sender, TagReadDataEventArgs e)
                     {
+                        //Note: The next IF-statement for Console logging purposes only ..
                         bool epcExistOnList = epcList.Contains(e.TagReadData.EpcString.ToString());
                         if(!epcExistOnList)
                         {
                             Console.WriteLine("RFID tag data: [count: " + e.TagReadData.ReadCount + "], EPC: " + e.TagReadData.EpcString + ", RAW DATA: " + e.TagReadData);
                             epcList.Add(e.TagReadData.EpcString.ToString());
                         }
-                        /*if (e.TagReadData.ReadCount < rfidCountThreshold)
+                        /*TODO: next readCount threshold functionality commented out. Fix it if necessarily to take account..
+                        if (e.TagReadData.ReadCount < rfidCountThreshold)
                         {
                             Console.WriteLine("***NOT a GOOD - RFID DATA: [count: " + e.TagReadData.ReadCount + "]: " + e.TagReadData);
                         }
@@ -124,8 +135,8 @@ namespace RfidReader
                             Console.WriteLine("RFID DATA: [count: " + e.TagReadData.ReadCount + "], EPC: " + e.TagReadData.EpcString);
                         }*/
 
+                        //Note: The next IF-statement for JSON server purposes ..
                         bool alreadyExist = js.rfidDataToString.Contains(e.TagReadData.EpcString.ToString());
-
                         if (!alreadyExist)
                         {
                             js.rfidDataToString.Add(e.TagReadData.EpcString.ToString());
@@ -140,9 +151,9 @@ namespace RfidReader
                         // Search for tags in the background
                         r.StartReading();
                         Console.WriteLine("r.StartReading() .. QUIT reading with CTRL + C");
-                        Thread.Sleep(rfidTimeout);
                         js.rfidDataToString.Clear();
                         epcList.Clear();
+                        Thread.Sleep(rfidTimeout);
                     }
 
                     r.StopReading();
@@ -210,7 +221,21 @@ namespace RfidReader
                     if (t.Key == "timeout")
                     {
                         int tmpValue = System.Convert.ToInt32(t.Value);
-                        Console.WriteLine("New timeout value given: " + tmpValue);
+                        if (tmpValue < 10)
+                        {
+                            Console.WriteLine("New timeout value is less than 10 ms -- not approved: " + tmpValue + ", default value 400 ms given");
+                            rfidTimeout = 400;
+                        }
+                        if (tmpValue > 10000)
+                        {
+                            Console.WriteLine("New timeout value is more than 10000 ms: " + tmpValue);
+                            rfidTimeout = tmpValue;
+                        }
+                        else
+                        {
+                            Console.WriteLine("New timeout value is given: " + tmpValue);
+                            rfidTimeout = tmpValue;
+                        }
                         //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
                     }
 
@@ -251,7 +276,7 @@ namespace RfidReader
 
                 //context.Response.KeepAlive = false; // set the KeepAlive bool to false
                 context.Response.Close(); // close the connection
-                Console.WriteLine("Respone given to a request.");
+                Console.WriteLine("Response given to a request.");
                 //json osuus loppuu
             }
         }

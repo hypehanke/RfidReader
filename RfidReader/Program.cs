@@ -34,6 +34,8 @@ namespace RfidReader
 
         static bool ok = true;
 
+        
+
         public class JsonStack
         {
             public string Name { get; set; }
@@ -46,7 +48,9 @@ namespace RfidReader
 
             public IList<int> availableRFIDList { get; set; }
 
-            public IList<string> rfidDataToString { get; set; }
+            public List<string> rfidDataToString { get; set; }
+
+            public List<string> cachedList { get; set; }
         }
 
         public class SimpleObject
@@ -123,7 +127,7 @@ namespace RfidReader
                  * RFID tag is came visible range of antenna.
                  * See more about Thread functionality from docs.
                  */
-                js.rfidDataToString.Clear();
+                
                 r.TagRead += delegate (Object sender, TagReadDataEventArgs e)
                 {
                     bool epcExistOnList = epcList.Contains(e.TagReadData.EpcString.ToString());
@@ -135,14 +139,6 @@ namespace RfidReader
                         //Console.WriteLine("RAW DATA: " + e.TagReadData);
                         epcList.Add(e.TagReadData.EpcString.ToString());
                     }
-                    /*if (e.TagReadData.ReadCount < thresholdValueForCount)
-                    {
-                        Console.WriteLine("***NOT a GOOD - RFID DATA: [count: " + e.TagReadData.ReadCount + "]: " + e.TagReadData);
-                    }
-                    else
-                    {
-                        Console.WriteLine("RFID DATA: [count: " + e.TagReadData.ReadCount + "], EPC: " + e.TagReadData.EpcString);
-                    }*/
                     
                     bool alreadyExist = js.rfidDataToString.Contains(e.TagReadData.EpcString.ToString());
 
@@ -153,33 +149,83 @@ namespace RfidReader
 
                     // Search for tags in the background
 
-
                 };
 
-
-                
+                js.cachedList = new List<string>();
                 while (ok)
                 {
+                    Console.WriteLine(js.rfidDataToString.Count.ToString());
                     Console.WriteLine("###");
                     Console.WriteLine("### Reading!, press Esc-key to quit!");
                     Console.WriteLine("###");
                     r.StartReading();
-                    //Console.WriteLine("Ok? " + ok);
-                    //Console.WriteLine("########################## r.StartReading() .. QUIT reading with CTRL + C");
-                    //Console.WriteLine("Sleep " + thresholdValueForThreadSleep.ToString());
+
+                    int foundTotal = 0;
+                    Console.WriteLine("\r\nCached");
+                    bool cacheIsUptodate = false;
+
+                    foreach (string i in js.cachedList) {
+                        bool found = false;
+                        foreach (string i2 in js.rfidDataToString)
+                        {
+                            Console.WriteLine(i + " == " + i2);
+                            if (i.Equals(i2))
+                            {
+                                //Console.WriteLine("Match");
+                                found = true;
+                            }
+                            else {
+                                //Console.WriteLine("NO Match");
+                            }
+                        }
+                        if (found) {
+                            Console.WriteLine("\r\n------>Still exists " + i + "\r\n");
+                            foundTotal++;
+                        }
+                        else
+                        {
+                            Console.WriteLine("\r\n------>Doesn't exists " + i + "\r\n");
+
+                        }
+                    }
+
+                    Console.WriteLine(js.rfidDataToString.Count + "==" + foundTotal);
+                    if (js.rfidDataToString.Count == foundTotal)
+                    {
+                        cacheIsUptodate = true;
+                    }
+                    else {
+                        cacheIsUptodate = false;
+                    }
+
+                    Console.WriteLine("\r\nCache uptodate state " + cacheIsUptodate);
+
+                    
+                    
+                    if (cacheIsUptodate)
+                    {
+                        js.rfidDataToString.Clear();
+                    }
+                    else
+                    {
+                        js.cachedList = js.rfidDataToString;
+                    }
+                    
 
 
                     //js.rfidDataToString.Clear();
                     epcList.Clear();
 
                     //Thread.Sleep(thresholdValueForThreadSleep);
-                    Thread.Sleep(100);
+                    Thread.Sleep(100); //muuta 100
                     //rfth.ThreadState;
 
                     r.StopReading();
                     //Console.WriteLine("########################## r.StopReading().");
 
+
                     
+
                 }
 
             }
@@ -252,6 +298,11 @@ namespace RfidReader
                 }
                 else if (cki.Key == ConsoleKey.Escape)
                 {
+                    Console.WriteLine("||||||||Stopping|||||||||");
+                    ok = false;
+                    Thread.Sleep(500);
+                    rfth.Join();
+                    rfth.Abort();
                     System.Environment.Exit(1);
                 }
             }
@@ -341,7 +392,7 @@ namespace RfidReader
                 context.Response.Close(); // close the connection
                 Console.WriteLine("Respone given to a request.");
                 //json osuus loppuu
-                
+                js.rfidDataToString.Clear();
             }
         }
 

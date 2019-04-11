@@ -34,7 +34,7 @@ namespace RfidReader
 
         static bool ok = true;
 
-        
+        static bool cacheIsUptodate = false;
 
         public class JsonStack
         {
@@ -136,8 +136,10 @@ namespace RfidReader
                         Console.WriteLine("------------");
                         Console.WriteLine("Count: " + e.TagReadData.ReadCount + "]");
                         Console.WriteLine("EPC: " + e.TagReadData.EpcString);
+                        Console.WriteLine("Timestamp: " + e.TagReadData.Time);
                         //Console.WriteLine("RAW DATA: " + e.TagReadData);
                         epcList.Add(e.TagReadData.EpcString.ToString());
+                        js.Expiry = e.TagReadData.Time;
                     }
                     
                     bool alreadyExist = js.rfidDataToString.Contains(e.TagReadData.EpcString.ToString());
@@ -146,6 +148,7 @@ namespace RfidReader
                     {
                         js.rfidDataToString.Add(e.TagReadData.EpcString.ToString());
                     }
+
 
                     // Search for tags in the background
 
@@ -162,7 +165,7 @@ namespace RfidReader
 
                     int foundTotal = 0;
                     Console.WriteLine("\r\nCached");
-                    bool cacheIsUptodate = false;
+                    cacheIsUptodate = false;
 
                     foreach (string i in js.cachedList) {
                         bool found = false;
@@ -200,16 +203,9 @@ namespace RfidReader
 
                     Console.WriteLine("\r\nCache uptodate state " + cacheIsUptodate);
 
+                    js.cachedList = js.rfidDataToString;
+
                     
-                    
-                    if (cacheIsUptodate)
-                    {
-                        js.rfidDataToString.Clear();
-                    }
-                    else
-                    {
-                        js.cachedList = js.rfidDataToString;
-                    }
                     
 
 
@@ -217,7 +213,7 @@ namespace RfidReader
                     epcList.Clear();
 
                     //Thread.Sleep(thresholdValueForThreadSleep);
-                    Thread.Sleep(100); //muuta 100
+                    Thread.Sleep(1000); //muuta 100
                     //rfth.ThreadState;
 
                     r.StopReading();
@@ -392,7 +388,16 @@ namespace RfidReader
                 context.Response.Close(); // close the connection
                 Console.WriteLine("Respone given to a request.");
                 //json osuus loppuu
-                js.rfidDataToString.Clear();
+
+                if (cacheIsUptodate)
+                {
+                    js.rfidDataToString.Clear();
+                }
+                else
+                {
+                    js.cachedList = js.rfidDataToString;
+                }
+
             }
         }
 

@@ -36,6 +36,10 @@ namespace RfidReader
 
         static bool cacheIsUptodate = false;
 
+        static bool serverStillResponding = false;
+
+        static int cacheFail = 0;
+
         public class JsonStack
         {
             public string Name { get; set; }
@@ -133,10 +137,9 @@ namespace RfidReader
                     bool epcExistOnList = epcList.Contains(e.TagReadData.EpcString.ToString());
                     if (!epcExistOnList)
                     {
-                        Console.WriteLine("------------");
+                        Console.WriteLine("----- " + e.TagReadData.Time + " -----");
                         Console.WriteLine("Count: " + e.TagReadData.ReadCount + "]");
                         Console.WriteLine("EPC: " + e.TagReadData.EpcString);
-                        Console.WriteLine("Timestamp: " + e.TagReadData.Time);
                         //Console.WriteLine("RAW DATA: " + e.TagReadData);
                         epcList.Add(e.TagReadData.EpcString.ToString());
                         js.Expiry = e.TagReadData.Time;
@@ -195,15 +198,24 @@ namespace RfidReader
                     Console.WriteLine(js.rfidDataToString.Count + "==" + foundTotal);
                     if (js.rfidDataToString.Count == foundTotal)
                     {
-                        cacheIsUptodate = true;
+                        //this tries to prevent empty response (would seem like tags not found which is a clitch) 
+                        if (foundTotal == 0 && cacheFail < 60)
+                        {
+                            cacheFail++;
+                            Console.WriteLine("\r\n Cache fail prevented " + cacheFail + " \r\n");
+                        }
+                        else {
+                            cacheIsUptodate = true;
+                        }
                     }
                     else {
                         cacheIsUptodate = false;
+                        js.cachedList = js.rfidDataToString;
                     }
 
                     Console.WriteLine("\r\nCache uptodate state " + cacheIsUptodate);
 
-                    js.cachedList = js.rfidDataToString;
+                    //js.cachedList = js.rfidDataToString;
 
                     
                     
@@ -311,91 +323,107 @@ namespace RfidReader
 
         static void JsonPack()
         {
+            //while (true)
             while (true)
             {
                 HttpListenerContext context = _httpListener.GetContext();
                 HttpListenerRequest request = context.Request;
 
-                NameValueCollection queryStringCollection = request.QueryString;
-
-                js.Info = new List<string>();
-                js.Info.Add("INFO: here are parameters what can be used ..");
-                js.Info.Add("How? Add them into IP address in above e.g.   ?timeout=100&antennapower=2300");
-                js.Info.Add("PARAMETERS:");
-                js.Info.Add("timeout        - with this you can change timeout value (ms) for RFID read loop e.g. 500");
-                js.Info.Add("antennapower   - with 4 number value you can change Antenna Read Power value (max: 27 dBm) e.g. 2700");
-
-                if (request.HttpMethod != null)
+                if (!serverStillResponding)
                 {
-                    js.requestType = request.HttpMethod;
-                }
-
-                //js.UsedParameters = request.QueryString;
-                js.UsedParameters = new List<SimpleObject>();
-                foreach (String key in queryStringCollection.AllKeys)
-                {
-                    Console.WriteLine("Key: " + key + " Value: " + queryStringCollection[key]);
-                    SimpleObject t = new SimpleObject();
-                    t.Key = key;
-                    t.Value = queryStringCollection[key];
-
-                    if (t.Key == "timeout")
-                    {
-                        int tmpValue = System.Convert.ToInt32(t.Value);
-                        Console.WriteLine("New timeout value given: " + tmpValue);
-                        //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
-
-                        thresholdValueForThreadSleep = tmpValue;
-                    }
-
-                    if (t.Key == "antennapower")
-                    {
-                        int tmpValue = System.Convert.ToInt32(t.Value);
-                        if (tmpValue > 2700)
-                        {
-                            Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
-                            string tmpStr = "2700";
-                            t.Value = tmpStr;
-                            rfidAntennapower = tmpValue;
-                        }
-                    }
-
-                    //tämä arvo ei muuta mitään rfid threadissa
-                    rfth.Abort();
-
+                    serverStillResponding = true;
                     
-                    Console.WriteLine("New antenna power value given: " + t.Value);
 
-                    rfth = new Thread(new ThreadStart(RFIDInit));
-                    rfth.Start();
+                    NameValueCollection queryStringCollection = request.QueryString;
 
-                    js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
+                    js.Info = new List<string>();
+                    js.Info.Add("INFO: here are parameters what can be used ..");
+                    js.Info.Add("How? Add them into IP address in above e.g.   ?timeout=100&antennapower=2300");
+                    js.Info.Add("PARAMETERS:");
+                    js.Info.Add("timeout        - with this you can change timeout value (ms) for RFID read loop e.g. 500");
+                    js.Info.Add("antennapower   - with 4 number value you can change Antenna Read Power value (max: 27 dBm) e.g. 2700");
 
+                    if (request.HttpMethod != null)
+                    {
+                        js.requestType = request.HttpMethod;
+                    }
+
+                    //js.UsedParameters = request.QueryString;
+                    js.UsedParameters = new List<SimpleObject>();
+                    foreach (String key in queryStringCollection.AllKeys)
+                    {
+                        Console.WriteLine("Key: " + key + " Value: " + queryStringCollection[key]);
+                        SimpleObject t = new SimpleObject();
+                        t.Key = key;
+                        t.Value = queryStringCollection[key];
+
+                        if (t.Key == "timeout")
+                        {
+                            int tmpValue = System.Convert.ToInt32(t.Value);
+                            Console.WriteLine("New timeout value given: " + tmpValue);
+                            //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
+
+                            thresholdValueForThreadSleep = tmpValue;
+                        }
+
+                        if (t.Key == "antennapower")
+                        {
+                            int tmpValue = System.Convert.ToInt32(t.Value);
+                            if (tmpValue > 2700)
+                            {
+                                Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
+                                string tmpStr = "2700";
+                                t.Value = tmpStr;
+                                rfidAntennapower = tmpValue;
+                            }
+                        }
+
+                        //tämä arvo ei muuta mitään rfid threadissa
+                        rfth.Abort();
+
+
+                        Console.WriteLine("New antenna power value given: " + t.Value);
+
+                        rfth = new Thread(new ThreadStart(RFIDInit));
+                        rfth.Start();
+
+                        js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
+
+                    }
+
+                    string json = JsonConvert.SerializeObject(js);
+
+                    if (request.HttpMethod == "GET")
+                    {
+                        // Here i can read all parameters in string but how to parse each one i don't know
+                        Console.WriteLine("-NOTE- Server ok");
+                    }
+
+                    byte[] _responseArray = Encoding.UTF8.GetBytes(json);
+                    context.Response.OutputStream.Write(_responseArray, 0, _responseArray.Length); // write bytes to the output stream
+
+                    //context.Response.KeepAlive = false; // set the KeepAlive bool to false
+                    context.Response.Close(); // close the connection
+                    Console.WriteLine("Respone given to a request.");
+                    //json osuus loppuu
+                    
+                    if (cacheIsUptodate)
+                    {
+                        js.rfidDataToString.Clear();
+                    }
+                    /*else
+                    {
+                        js.cachedList = js.rfidDataToString;
+                    }
+                    */
+                    serverStillResponding = false;
                 }
-
-                string json = JsonConvert.SerializeObject(js);
-
-                if (request.HttpMethod == "GET")
-                {
-                    // Here i can read all parameters in string but how to parse each one i don't know
-                    Console.WriteLine("Got get parameter(s)");
-                }
-
-                byte[] _responseArray = Encoding.UTF8.GetBytes(json);
-                context.Response.OutputStream.Write(_responseArray, 0, _responseArray.Length); // write bytes to the output stream
-
-                //context.Response.KeepAlive = false; // set the KeepAlive bool to false
-                context.Response.Close(); // close the connection
-                Console.WriteLine("Respone given to a request.");
-                //json osuus loppuu
-
-                if (cacheIsUptodate)
-                {
-                    js.rfidDataToString.Clear();
-                }
-                else
-                {
-                    js.cachedList = js.rfidDataToString;
+                else {
+                    if (request.HttpMethod == "GET")
+                    {
+                        // Here i can read all parameters in string but how to parse each one i don't know
+                        Console.WriteLine("-ATTENTION- Server still responding");
+                    }
                 }
 
             }

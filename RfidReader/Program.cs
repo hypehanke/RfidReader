@@ -39,7 +39,8 @@ namespace RfidReader
         
         static bool serverStillResponding = false;
 
-        static bool firstTime = true;
+        static List<string> c;
+
         
         public class JsonStack
         {
@@ -54,6 +55,8 @@ namespace RfidReader
             public IList<int> availableRFIDList { get; set; }
 
             public List<string> currentRFIDs { get; set; }
+
+            public List<string> oldListRFIDs { get; set; }
 
             public List<string> allFoundRFIDs { get; set; }
 
@@ -162,36 +165,37 @@ namespace RfidReader
 
                 };
 
-                
+
                 while (ok)
+                //try
                 {
-                    Console.WriteLine("###");
+                    
+                    Console.WriteLine("\r\n###");
                     Console.WriteLine("### Reading!, press Esc-key to quit!");
-                    Console.WriteLine("###");
+                    Console.WriteLine("###\r\n");
                     r.StartReading();
 
                     epcList.Clear();
-
-                    /*
-                    Console.WriteLine("|||||||||||||||||||||||||||||||"+serverStillResponding);
-                    //if (!js.currentRFIDs.Count.Equals(0) && !serverStillResponding)
-                    if (!serverStillResponding)
-                    {
-                        Console.WriteLine("Clear ####################################################################");
-                        js.currentRFIDs.Clear();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Server prevent -------------------------------------------------------------------");
-                    }
-                    */
-
-                    //Thread.Sleep(thresholdValueForThreadSleep);
-                    Thread.Sleep(100); //muuta 100
-                    //rfth.ThreadState;
-
+                    Thread.Sleep(100);
+                    
                     r.StopReading();
+                    //serverStillResponding = false;
                 }
+                /*
+                catch (Exception ex)
+                {
+                    Console.WriteLine("!!!!!!!!!!!!!!WARNING!!!!!!!!!!!!!!");
+                    Console.WriteLine("Error [reading tags]: " + ex.Message);
+                    Console.WriteLine("!!!!!!!!!!!!!!WARNING!!!!!!!!!!!!!!");
+                }
+                finally
+                {
+                    Console.WriteLine("### Reading done");
+                    serverStillResponding = false;
+                }
+                */
+
+                //serverStillResponding = false;
 
             }
 
@@ -282,152 +286,168 @@ namespace RfidReader
         {
             //while (true)
 
-            
+            bool readError = false;
             try
             {
-                //Thread.Sleep(1000);
-                serverStillResponding = true;
+                //Thread.Sleep(500);
+                //serverStillResponding = true;
                 //do
                 //{
 
-                    HttpListenerContext context = _httpListener.GetContext();
-                    HttpListenerRequest request = context.Request;
+                HttpListenerContext context = _httpListener.GetContext();
+                HttpListenerRequest request = context.Request;
 
-                    //serverStillResponding = true;
-                    NameValueCollection queryStringCollection = request.QueryString;
+                //serverStillResponding = true;
+                NameValueCollection queryStringCollection = request.QueryString;
 
-                    js.Info = new List<string>();
-                    js.Info.Add("INFO: here are parameters what can be used ..");
-                    js.Info.Add("How? Add them into IP address in above e.g.   ?timeout=100&antennapower=2300");
-                    js.Info.Add("PARAMETERS:");
-                    js.Info.Add("timeout        - with this you can change timeout value (ms) for RFID read loop e.g. 500");
-                    js.Info.Add("antennapower   - with 4 number value you can change Antenna Read Power value (max: 27 dBm) e.g. 2700");
+                js.Info = new List<string>();
+                js.Info.Add("INFO: here are parameters what can be used ..");
+                js.Info.Add("How? Add them into IP address in above e.g.   ?timeout=100&antennapower=2300");
+                js.Info.Add("PARAMETERS:");
+                js.Info.Add("timeout        - with this you can change timeout value (ms) for RFID read loop e.g. 500");
+                js.Info.Add("antennapower   - with 4 number value you can change Antenna Read Power value (max: 27 dBm) e.g. 2700");
 
-                    js.Info.Add("Server ip(s):");
-                    foreach (IPAddress ip in servingIP)
+                js.Info.Add("Server ip(s):");
+                foreach (IPAddress ip in servingIP)
+                {
+                    js.Info.Add("http://" + ip.ToString() + ":5000/");
+                }
+
+
+                if (request.HttpMethod != null)
+                {
+                    js.requestType = request.HttpMethod;
+                }
+
+                //js.UsedParameters = request.QueryString;
+                js.UsedParameters = new List<SimpleObject>();
+                foreach (String key in queryStringCollection.AllKeys)
+                {
+                    Console.WriteLine("Key: " + key + " Value: " + queryStringCollection[key]);
+                    SimpleObject t = new SimpleObject();
+                    t.Key = key;
+                    t.Value = queryStringCollection[key];
+
+                    if (t.Key == "timeout")
                     {
-                        js.Info.Add("http://" + ip.ToString() + ":5000/");
+                        int tmpValue = System.Convert.ToInt32(t.Value);
+                        Console.WriteLine("New timeout value given: " + tmpValue);
+                        //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
+
+                        thresholdValueForThreadSleep = tmpValue;
                     }
 
-
-                    if (request.HttpMethod != null)
+                    if (t.Key == "antennapower")
                     {
-                        js.requestType = request.HttpMethod;
-                    }
-
-                    //js.UsedParameters = request.QueryString;
-                    js.UsedParameters = new List<SimpleObject>();
-                    foreach (String key in queryStringCollection.AllKeys)
-                    {
-                        Console.WriteLine("Key: " + key + " Value: " + queryStringCollection[key]);
-                        SimpleObject t = new SimpleObject();
-                        t.Key = key;
-                        t.Value = queryStringCollection[key];
-
-                        if (t.Key == "timeout")
+                        int tmpValue = System.Convert.ToInt32(t.Value);
+                        if (tmpValue > 2700)
                         {
-                            int tmpValue = System.Convert.ToInt32(t.Value);
-                            Console.WriteLine("New timeout value given: " + tmpValue);
-                            //TODO: ADD HERE A PUBLIC PARAMETER WHERE YOU CAN SET THIS GIVEN VALUE !?
-
-                            thresholdValueForThreadSleep = tmpValue;
-                        }
-
-                        if (t.Key == "antennapower")
-                        {
-                            int tmpValue = System.Convert.ToInt32(t.Value);
-                            if (tmpValue > 2700)
-                            {
-                                Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
-                                string tmpStr = "2700";
-                                t.Value = tmpStr;
-                                rfidAntennapower = tmpValue;
-                            }
-                        }
-
-                        //tämä arvo ei muuta mitään rfid threadissa
-                        rfth.Abort();
-
-
-                        Console.WriteLine("New antenna power value given: " + t.Value);
-
-                        rfth = new Thread(new ThreadStart(RFIDInit));
-                        rfth.Start();
-
-                        js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
-
-                    }
-
-                    Console.WriteLine("count " + js.currentRFIDs.Count);
-                    Console.WriteLine("count on 0 " + js.currentRFIDs.Count.Equals(0));
-
-                    Console.WriteLine("old list ");
-                    List<string> oldlist = new List<string>();
-                    oldlist = js.allFoundRFIDs;
-                    foreach (string i in js.currentRFIDs)
-                    {
-                        Console.WriteLine("- " + i);
-
-                        bool alreadyExist = js.allFoundRFIDs.Contains(i);
-
-                        if (!alreadyExist)
-                        {
-                            js.allFoundRFIDs.Add(i);
+                            Console.WriteLine("***PROBLEM: given antenna power value: " + tmpValue + " was too high (max: 2700 i.e. 27 dBm), so default value to be used.");
+                            string tmpStr = "2700";
+                            t.Value = tmpStr;
+                            rfidAntennapower = tmpValue;
                         }
                     }
 
-                    Console.WriteLine("compared caches ");
-                    List<string> comparedList = new List<string>();
-                    comparedList = oldlist.Except(js.allFoundRFIDs).ToList();
-                    foreach (string i in comparedList)
+                    //tämä arvo ei muuta mitään rfid threadissa
+                    rfth.Abort();
+
+
+                    Console.WriteLine("New antenna power value given: " + t.Value);
+
+                    rfth = new Thread(new ThreadStart(RFIDInit));
+                    rfth.Start();
+
+                    js.UsedParameters.Add(t); // NOTICE that given parameter handling is before that code line.
+
+                }
+
+                Console.WriteLine("count " + js.currentRFIDs.Count);
+                Console.WriteLine("count on 0 " + js.currentRFIDs.Count.Equals(0));
+
+                Console.WriteLine("old list ");
+                List<string> oldlist = new List<string>();
+                oldlist = js.allFoundRFIDs;
+                foreach (string i in js.currentRFIDs)
+                {
+                    Console.WriteLine("- " + i);
+
+                    bool alreadyExist = js.allFoundRFIDs.Contains(i);
+
+                    if (!alreadyExist)
                     {
-                        Console.WriteLine("- " + i);
+                        js.allFoundRFIDs.Add(i);
                     }
+                }
 
-                    Console.WriteLine("compared current ");
-                    List<string> comparedList2 = new List<string>();
-                    comparedList2 = oldlist.Except(js.currentRFIDs).ToList();
-                    foreach (string i in comparedList2)
+                Console.WriteLine("compared caches ");
+                List<string> comparedList = new List<string>();
+                comparedList = oldlist.Except(js.allFoundRFIDs).ToList();
+                foreach (string i in comparedList)
+                {
+                    Console.WriteLine("- " + i);
+                }
+
+                Console.WriteLine("compared current ");
+                List<string> comparedList2 = new List<string>();
+                comparedList2 = oldlist.Except(js.currentRFIDs).ToList();
+                foreach (string i in comparedList2)
+                {
+                    Console.WriteLine("- " + i);
+                }
+
+                js.differenceBetweenCurrentAndFoundRFIDs = comparedList2;
+
+                //a.AddRange(b)
+
+                js.oldListRFIDs = new List<string>();
+
+                js.oldListRFIDs = c;
+                if (js.currentRFIDs.Count > 0)
+                {
+                    js.Info.Add("Hyvä juttu");
+                    readError = false;
+                }
+                else
+                {
+                    js.Info.Add("Hämärä tyhjä!!!");
+                    readError = true;
+                }
+
+
+                string json = JsonConvert.SerializeObject(js);
+
+                if (request.HttpMethod == "GET")
+                {
+                    // Here i can read all parameters in string but how to parse each one i don't know
+                    Console.WriteLine("-NOTE- Server ok");
+                }
+
+
+                byte[] _responseArray = Encoding.UTF8.GetBytes(json);
+                context.Response.OutputStream.Write(_responseArray, 0, _responseArray.Length); // write bytes to the output stream
+
+                //context.Response.KeepAlive = false; // set the KeepAlive bool to false
+                context.Response.Close(); // close the connection
+                Console.WriteLine("Respone given to a request.");
+
+                //json osuus loppuu
+
+                Console.WriteLine("count " + js.currentRFIDs.Count);
+
+                /*
+                    if (!js.currentRFIDs.Count.Equals(0))
                     {
-                        Console.WriteLine("- " + i);
+                        Console.WriteLine("Clear ####################################################################");
+                        js.currentRFIDs.Clear();
                     }
-
-                    js.differenceBetweenCurrentAndFoundRFIDs = comparedList2;
-
-                    //a.AddRange(b)
-
-                    string json = JsonConvert.SerializeObject(js);
-
-                    if (request.HttpMethod == "GET")
-                    {
-                        // Here i can read all parameters in string but how to parse each one i don't know
-                        Console.WriteLine("-NOTE- Server ok");
+                    else {
+                        Console.WriteLine("ok ####################################################################");
                     }
-
-                    byte[] _responseArray = Encoding.UTF8.GetBytes(json);
-                    context.Response.OutputStream.Write(_responseArray, 0, _responseArray.Length); // write bytes to the output stream
-
-                    //context.Response.KeepAlive = false; // set the KeepAlive bool to false
-                    context.Response.Close(); // close the connection
-                    Console.WriteLine("Respone given to a request.");
-
-                    //json osuus loppuu
-
-                    Console.WriteLine("count " + js.currentRFIDs.Count);
-
-                    /*
-                     if (!js.currentRFIDs.Count.Equals(0))
-                     {
-                         Console.WriteLine("Clear ####################################################################");
-                         js.currentRFIDs.Clear();
-                     }
-                     else {
-                         Console.WriteLine("ok ####################################################################");
-                     }
-                     */
+                    */
 
 
-                    
+
                 //}
                 //while (!serverStillResponding);
             }
@@ -440,12 +460,31 @@ namespace RfidReader
             }
             finally
             {
-                //Console.WriteLine("sadksadlööksdlaöksdlaöksadlklsadöklsadösadlösadöksdlökl");
-                //little delay to prevent spamming
-                js.currentRFIDs.Clear();
-                Thread.Sleep(1000);
-                //Console.WriteLine("2 sadksadlööksdlaöksdlaöksadlklsadöklsadösadlösadöksdlökl");
-                serverStillResponding = false;
+                //c = js.currentRFIDs;
+                if (!readError)
+                { 
+                    c = new List<string>();
+                    foreach (string i in js.currentRFIDs)
+                    {
+                        Console.WriteLine("-33 " + i);
+                        c.Add(i);
+                    }
+                }
+
+                Console.WriteLine("Clear ####################################################################");
+
+                //if (!readError)
+                //{
+                    js.currentRFIDs.Clear();
+                //}
+
+                foreach (string i in c)
+                {
+                    Console.WriteLine("-44 " + i);
+                }
+
+                //Thread.Sleep(1000);
+              
                 JsonPack();
             }
 

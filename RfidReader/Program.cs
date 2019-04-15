@@ -47,6 +47,7 @@ namespace RfidReader
             public string Name { get; set; }
             public DateTime Expiry { get; set; }
             public IList<string> Info { get; set; }
+            public bool useCached { get; set; }
 
             public IList<SimpleObject> UsedParameters { get; set; }
 
@@ -138,7 +139,8 @@ namespace RfidReader
                  * RFID tag is came visible range of antenna.
                  * See more about Thread functionality from docs.
                  */
-                
+
+                // Search for tags in the background
                 r.TagRead += delegate (Object sender, TagReadDataEventArgs e)
                 {
                     bool epcExistOnList = epcList.Contains(e.TagReadData.EpcString.ToString());
@@ -159,43 +161,22 @@ namespace RfidReader
                     {
                         js.currentRFIDs.Add(tagId);
                     }
-
-
-                    // Search for tags in the background
-
                 };
 
+                
 
                 while (ok)
-                //try
                 {
-                    
                     Console.WriteLine("\r\n###");
                     Console.WriteLine("### Reading!, press Esc-key to quit!");
                     Console.WriteLine("###\r\n");
                     r.StartReading();
 
                     epcList.Clear();
-                    Thread.Sleep(100);
+                    Thread.Sleep(80);
                     
                     r.StopReading();
-                    //serverStillResponding = false;
                 }
-                /*
-                catch (Exception ex)
-                {
-                    Console.WriteLine("!!!!!!!!!!!!!!WARNING!!!!!!!!!!!!!!");
-                    Console.WriteLine("Error [reading tags]: " + ex.Message);
-                    Console.WriteLine("!!!!!!!!!!!!!!WARNING!!!!!!!!!!!!!!");
-                }
-                finally
-                {
-                    Console.WriteLine("### Reading done");
-                    serverStillResponding = false;
-                }
-                */
-
-                //serverStillResponding = false;
 
             }
 
@@ -289,11 +270,6 @@ namespace RfidReader
             bool readError = false;
             try
             {
-                //Thread.Sleep(500);
-                //serverStillResponding = true;
-                //do
-                //{
-
                 HttpListenerContext context = _httpListener.GetContext();
                 HttpListenerRequest request = context.Request;
 
@@ -405,12 +381,14 @@ namespace RfidReader
                 js.oldListRFIDs = c;
                 if (js.currentRFIDs.Count > 0)
                 {
-                    js.Info.Add("Hyvä juttu");
+                    js.useCached = false;
+                    js.Info.Add("Data ok");
                     readError = false;
                 }
                 else
                 {
-                    js.Info.Add("Hämärä tyhjä!!!");
+                    js.useCached = true;
+                    js.Info.Add("Data was weird!!!");
                     readError = true;
                 }
 
@@ -430,26 +408,8 @@ namespace RfidReader
                 //context.Response.KeepAlive = false; // set the KeepAlive bool to false
                 context.Response.Close(); // close the connection
                 Console.WriteLine("Respone given to a request.");
-
                 //json osuus loppuu
-
-                Console.WriteLine("count " + js.currentRFIDs.Count);
-
-                /*
-                    if (!js.currentRFIDs.Count.Equals(0))
-                    {
-                        Console.WriteLine("Clear ####################################################################");
-                        js.currentRFIDs.Clear();
-                    }
-                    else {
-                        Console.WriteLine("ok ####################################################################");
-                    }
-                    */
-
-
-
-                //}
-                //while (!serverStillResponding);
+                
             }
             catch (Exception ex)
             {
@@ -473,17 +433,16 @@ namespace RfidReader
 
                 Console.WriteLine("Clear ####################################################################");
 
-                //if (!readError)
-                //{
-                    js.currentRFIDs.Clear();
-                //}
+                js.currentRFIDs.Clear();
+               
 
                 foreach (string i in c)
                 {
                     Console.WriteLine("-44 " + i);
                 }
 
-                //Thread.Sleep(1000);
+                //little delay before next response
+                //Thread.Sleep(400);
               
                 JsonPack();
             }
